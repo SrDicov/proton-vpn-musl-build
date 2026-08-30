@@ -1,0 +1,123 @@
+name: Build Rust components for musl (Void Linux)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/build-rust-musl.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-rust:
+    name: Build proton-vpn-platform (musl)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools musl-dev pkg-config libssl-dev \
+            libdbus-1-dev libglib2.0-dev libgirepository1.0-dev \
+            clang llvm
+
+      - name: Install Rust (musl target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: x86_64-unknown-linux-musl
+
+      - name: Checkout python-proton-vpn-api-core
+        uses: actions/checkout@v4
+        with:
+          repository: ProtonVPN/python-proton-vpn-api-core
+          ref: stable
+          path: api-core
+          submodules: false
+
+      - name: Fetch protun submodule from GitHub
+        working-directory: api-core
+        run: |
+          git clone --depth 1 --branch stable https://github.com/ProtonVPN/protun.git dependencies/protun
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            api-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('api-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build proton-vpn-platform (musl release)
+        working-directory: api-core
+        env:
+          CARGO_BUILD_JOBS: 2
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: |
+          cargo build --features "python,core,local_agent,protun" \
+            --target x86_64-unknown-linux-musl --release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proton-vpn-platform-musl
+          path: |
+            api-core/target/x86_64-unknown-linux-musl/release/libproton_vpn_platform.so
+            api-core/target/x86_64-unknown-linux-musl/release/nm-protun-service
+            api-core/target/x86_64-unknown-linux-musl/release/nm-protun-auth-dialog
+            api-core/target/x86_64-unknown-linux-musl/release/local-agent
+          retention-days: 7
+
+  build-local-agent:
+    name: Build python-proton-vpn-local-agent (musl)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools musl-dev pkg-config libssl-dev
+
+      - name: Install Rust (musl target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: x86_64-unknown-linux-musl
+
+      - name: Checkout python-proton-vpn-local-agent
+        uses: actions/checkout@v4
+        with:
+          repository: ProtonVPN/python-proton-vpn-local-agent
+          ref: stable
+          path: local-agent
+          submodules: false
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            local-agent/target
+          key: ${{ runner.os }}-cargo-local-agent-${{ hashFiles('local-agent/Cargo.lock') }}
+
+      - name: Build local-agent (musl release)
+        working-directory: local-agent
+        env:
+          CARGO_BUILD_JOBS: 2
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: |
+          cargo build --release --target x86_64-unknown-linux-musl
+
+      - name: Upload local-agent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: proton-vpn-local-agent-musl
+          path: |
+            local-agent/target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent
+            local-agent/target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent-*
+          retention-days: 7
