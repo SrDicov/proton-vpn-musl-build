@@ -14,7 +14,7 @@ jobs:
   build-rust:
     name: Build proton-vpn-platform (musl)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Install system dependencies
@@ -22,7 +22,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools musl-dev pkg-config libssl-dev \
             libdbus-1-dev libglib2.0-dev libgirepository1.0-dev \
-            clang llvm
+            clang llvm cmake protobuf-compiler
 
       - name: Install Rust (musl target)
         uses: dtolnay/rust-toolchain@stable
@@ -37,10 +37,11 @@ jobs:
           path: api-core
           submodules: false
 
-      - name: Fetch protun submodule from GitHub
+      - name: Fetch protun from GitHub (try stable, fallback main)
         working-directory: api-core
         run: |
-          git clone --depth 1 --branch stable https://github.com/ProtonVPN/protun.git dependencies/protun
+          git clone --depth 1 --branch stable https://github.com/ProtonVPN/protun.git dependencies/protun 2>/dev/null || \
+          git clone --depth 1 --branch main https://github.com/ProtonVPN/protun.git dependencies/protun
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -59,8 +60,9 @@ jobs:
           CARGO_BUILD_JOBS: 2
           RUSTFLAGS: "-C target-feature=+crt-static"
         run: |
+          set -x
           cargo build --features "python,core,local_agent,protun" \
-            --target x86_64-unknown-linux-musl --release
+            --target x86_64-unknown-linux-musl --release 2>&1 | tee build.log
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -73,28 +75,42 @@ jobs:
             api-core/target/x86_64-unknown-linux-musl/release/local-agent
           retention-days: 7
 
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-rust-failure-log
+          path: api-core/build.log
+          retention-days: 7
+
   build-local-agent:
     name: Build python-proton-vpn-local-agent (musl)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev pkg-config libssl-dev
+          sudo apt-get install -y musl-tools musl-dev pkg-config libssl-dev cmake
 
       - name: Install Rust (musl target)
         uses: dtolnay/rust-toolchain@stable
         with:
           target: x86_64-unknown-linux-musl
 
-      - name: Checkout python-proton-vpn-local-agent
+      - name: Checkout python-proton-vpn-local-agent (try stable, fallback main)
         uses: actions/checkout@v4
         with:
           repository: ProtonVPN/python-proton-vpn-local-agent
           ref: stable
           path: local-agent
           submodules: false
+
+      - name: Retry checkout on main if stable failed
+        if: failure()
+        run: |
+          rm -rf local-agent
+          git clone --depth 1 --branch main https://github.com/ProtonVPN/python-proton-vpn-local-agent.git local-agent
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -111,7 +127,8 @@ jobs:
           CARGO_BUILD_JOBS: 2
           RUSTFLAGS: "-C target-feature=+crt-static"
         run: |
-          cargo build --release --target x86_64-unknown-linux-musl
+          set -x
+          cargo build --release --target x86_64-unknown-linux-musl 2>&1 | tee build.log
 
       - name: Upload local-agent artifact
         uses: actions/upload-artifact@v4
@@ -120,4 +137,12 @@ jobs:
           path: |
             local-agent/target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent
             local-agent/target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent-*
+          retention-days: 7
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-local-agent-failure-log
+          path: local-agent/build.log
           retention-days: 7
