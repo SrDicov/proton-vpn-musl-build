@@ -64,6 +64,13 @@ jobs:
           cargo build --features "python,core,local_agent,protun" \
             --target x86_64-unknown-linux-musl --release 2>&1 | tee build.log
 
+      - name: Debug - list built files
+        working-directory: api-core
+        run: |
+          echo "=== Built files ==="
+          find target/x86_64-unknown-linux-musl/release -type f -name "*.so" -o -name "nm-protun*" -o -name "local-agent*" | head -20
+          ls -la target/x86_64-unknown-linux-musl/release/ | head -30
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
