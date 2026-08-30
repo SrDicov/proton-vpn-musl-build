@@ -69,10 +69,10 @@ jobs:
         with:
           name: proton-vpn-platform-musl
           path: |
-            api-core/target/x86_64-unknown-linux-musl/release/libproton_vpn_platform.so
-            api-core/target/x86_64-unknown-linux-musl/release/nm-protun-service
-            api-core/target/x86_64-unknown-linux-musl/release/nm-protun-auth-dialog
-            api-core/target/x86_64-unknown-linux-musl/release/local-agent
+            target/x86_64-unknown-linux-musl/release/libproton_vpn_platform.so
+            target/x86_64-unknown-linux-musl/release/nm-protun-service
+            target/x86_64-unknown-linux-musl/release/nm-protun-auth-dialog
+            target/x86_64-unknown-linux-musl/release/local-agent
           retention-days: 7
 
       - name: Upload build log on failure
@@ -135,8 +135,8 @@ jobs:
         with:
           name: proton-vpn-local-agent-musl
           path: |
-            local-agent/target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent
-            local-agent/target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent-*
+            target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent
+            target/x86_64-unknown-linux-musl/release/proton-vpn-local-agent-*
           retention-days: 7
 
       - name: Upload build log on failure
