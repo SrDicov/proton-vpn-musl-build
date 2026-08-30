@@ -37,11 +37,11 @@ jobs:
           path: api-core
           submodules: false
 
-      - name: Fetch protun from GitHub (try stable, fallback main)
+      - name: Fetch protun from GitHub (try stable, fallback master)
         working-directory: api-core
         run: |
           git clone --depth 1 --branch stable https://github.com/ProtonVPN/protun.git dependencies/protun 2>/dev/null || \
-          git clone --depth 1 --branch main https://github.com/ProtonVPN/protun.git dependencies/protun
+          git clone --depth 1 --branch master https://github.com/ProtonVPN/protun.git dependencies/protun
 
       - name: Cache cargo registry
         uses: actions/cache@v4
